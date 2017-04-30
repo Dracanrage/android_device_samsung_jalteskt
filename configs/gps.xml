@@ -16,20 +16,28 @@
        LPmode="false"
        CpColdStart="false"
        CpGuardTimeSec="1"
-
+       ReAidingOnHotStart="false"
        SuplEnable="true"
-       SuplUseApn="false"
-       SuplTlsCertPath="/system/etc/gps.cer"
+       SuplUseApn="true"
+       SuplTlsCertPath="/system/bin/gps.cer"
        SuplTlsEnable="false"
+       ReAidingIntervalSec="1200"
        SuplUT1Seconds="20"
        SuplUT2Seconds="20"
        SuplUT3Seconds="20"
        SuplVersion="1"
+       SuplMinorVersion="1"
+       SuplUseFwDns="true"
 
        LbsEnable="true"
        LbsServer="BCMLS2.glpals.com"
        HttpSyncLto="true"
+       LbsCellEnable="false"
        LtoDir="/data/system/gps/"
+
+       HulaSensorMask="0x1F"
+       SuplLppCapable="false"
+       SuplEcidCapable="true"
 
        IgnoreJniTime="true"
        AssertEnabled="false"
@@ -37,7 +45,7 @@
 
   <gll
        LogPriMask="LOG_INFO"
-       LogFacMask="LOG_GLLIO | LOG_RAWDATA | LOG_DEVKF | LOG_GLLAPI | LOG_NMEA"
+       LogFacMask="LOG_GLLIO | LOG_RAWDATA | LOG_GLLAPI | LOG_NMEA"
        FrqPlan="FRQ_PLAN_26MHZ_2PPM_26MHZ_300PPB"
        RfType="GL_RF_47521_BRCM_EXT_LNA"
        WarmStandbyTimeout1Seconds="10"
