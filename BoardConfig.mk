@@ -35,7 +35,7 @@ TARGET_KERNEL_CONFIG := lineageos_jalteskt_defconfig
 BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(LOCAL_PATH)/bluetooth
 
 # Linker
-LINKER_FORCED_SHIM_LIBS := /system/bin/gpsd|libdmitry.so
+LINKER_FORCED_SHIM_LIBS := /system/bin/gpsd|libdmitry.so:/system/lib/libril.so|libsamsung_symbols.so
 
 # Radio
 BOARD_GLOBAL_CFLAGS += -DSEC_PRODUCT_FEATURE_RIL_CALL_DUALMODE_CDMAGSM
