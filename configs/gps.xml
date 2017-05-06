@@ -19,7 +19,7 @@
        ReAidingOnHotStart="false"
        SuplEnable="true"
        SuplUseApn="true"
-       SuplTlsCertPath="/system/bin/gps.cer"
+       SuplTlsCertPath="/system/etc/gps.cer"
        SuplTlsEnable="false"
        ReAidingIntervalSec="1200"
        SuplUT1Seconds="20"
