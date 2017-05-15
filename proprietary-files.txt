@@ -164,3 +164,4 @@ lib/libril.so
 lib/libreference-ril.so
 lib/libsecnativefeature.so
 lib/libsec-ril.so
+lib/libsecril-client.so
