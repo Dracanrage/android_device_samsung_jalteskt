@@ -30,6 +30,7 @@ import android.os.Registrant;
 import com.android.internal.telephony.uicc.IccCardApplicationStatus;
 import com.android.internal.telephony.uicc.IccCardStatus;
 import com.android.internal.telephony.uicc.IccRefreshResponse;
+import com.android.internal.telephony.uicc.IccUtils;
 
 import com.android.internal.telephony.DriverCall;
 
@@ -501,7 +502,7 @@ public class SS222RIL extends RIL implements CommandsInterface {
             acquireWakeLock(rr, FOR_ACK_WAKELOCK);
             msg.sendToTarget();
             if (RILJ_LOGD) {
-                riljLog("Unsol response received for " + responseToString(response) +
+                riljLog("Unsol response received for " + responseToString(origResponse) +
                         " Sending ack to ril.cpp");
             }
         }
