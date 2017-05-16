@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The CyanogenMod Project <http://www.cyanogenmod.org>
+ * Copyright (c) 2014, The CyanogenMod Project. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.android.internal.telephony;
 import static com.android.internal.telephony.RILConstants.*;
 
 import android.content.Context;
+import android.telephony.Rlog;
 
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -27,6 +28,10 @@ import android.os.Parcel;
 import android.os.SystemProperties;
 import android.os.Registrant;
 
+import android.telephony.PhoneNumberUtils;
+import android.telephony.SignalStrength;
+import android.telephony.ModemActivityInfo;
+import android.telephony.SmsManager;
 import com.android.internal.telephony.uicc.IccCardApplicationStatus;
 import com.android.internal.telephony.uicc.IccCardStatus;
 import com.android.internal.telephony.uicc.IccRefreshResponse;
@@ -34,19 +39,14 @@ import com.android.internal.telephony.uicc.IccUtils;
 
 import com.android.internal.telephony.DriverCall;
 
-import android.telephony.PhoneNumberUtils;
-import android.telephony.SignalStrength;
-import android.telephony.ModemActivityInfo;
-import android.telephony.Rlog;
-import android.telephony.SmsManager;
-
 import java.util.ArrayList;
 import java.util.Collections;
 
 public class SS222RIL extends RIL implements CommandsInterface {
 
-    //SAMSUNG STATES
-
+    /**********************************************************
+     * SAMSUNG REQUESTS
+     **********************************************************/
     //request
     static final int RIL_REQUEST_DIAL_EMERGENCY_CALL = 10001;
     static final int RIL_REQUEST_CALL_DEFLECTION = 10002;
@@ -143,17 +143,6 @@ public class SS222RIL extends RIL implements CommandsInterface {
             return null;
         }
 
-        if (getRilVersion() >= 13 && type == RESPONSE_SOLICITED_ACK_EXP) {
-            Message msg;
-            RILRequest response = RILRequest.obtain(RIL_RESPONSE_ACKNOWLEDGEMENT, null);
-            msg = mSender.obtainMessage(EVENT_SEND_ACK, response);
-            acquireWakeLock(rr, FOR_ACK_WAKELOCK);
-            msg.sendToTarget();
-            if (RILJ_LOGD) {
-                riljLog("Response received for " + rr.serialString() + " " +
-                        requestToString(rr.mRequest) + " Sending ack to ril.cpp");
-            }
-        }
 
         Object ret = null;
 
@@ -402,11 +391,12 @@ public class SS222RIL extends RIL implements CommandsInterface {
         }
 
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_DIAL, result);
+
         rr.mParcel.writeString(address);
         rr.mParcel.writeInt(clirMode);
-	rr.mParcel.writeInt(0);
-	rr.mParcel.writeInt(1);
-	rr.mParcel.writeString("");
+        rr.mParcel.writeInt(0);     // CallDetails.call_type
+        rr.mParcel.writeInt(1);     // CallDetails.call_domain
+        rr.mParcel.writeString(""); // CallDetails.getCsvFromExtras
 
         if (uusInfo == null) {
             rr.mParcel.writeInt(0); // UUS information is absent
@@ -420,7 +410,7 @@ public class SS222RIL extends RIL implements CommandsInterface {
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         send(rr);
-	return;
+        return;
     }
 
     public void
@@ -430,17 +420,15 @@ public class SS222RIL extends RIL implements CommandsInterface {
         RILRequest rr = RILRequest.obtain(10001, result);
         rr.mParcel.writeString(address + "/");
         rr.mParcel.writeInt(clirMode);
-        rr.mParcel.writeInt(0);  // UUS information is absent
-
-	rr.mParcel.writeInt(3);
-	rr.mParcel.writeString("");
-	rr.mParcel.writeInt(0);
+        rr.mParcel.writeInt(0);        // CallDetails.call_type
+        rr.mParcel.writeInt(3);        // CallDetails.call_domain
+        rr.mParcel.writeString("");    // CallDetails.getCsvFromExtra
+        rr.mParcel.writeInt(0);        // Unknown
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         send(rr);
-	return;
-
+        return;
     }
 
     @Override
@@ -482,72 +470,6 @@ public class SS222RIL extends RIL implements CommandsInterface {
             cardStatus.mApplications[i] = appStatus;
         }
         return cardStatus;
-    }
-
-
-    @Override
-    protected void
-    processUnsolicited(Parcel p, int type) {
-        Object ret;
-
-        int dataPosition = p.dataPosition();
-        int origResponse = p.readInt();
-        int newResponse = origResponse;
-
-        // Follow new symantics of sending an Ack starting from RIL version 13
-        if (getRilVersion() >= 13 && type == RESPONSE_UNSOLICITED_ACK_EXP) {
-            Message msg;
-            RILRequest rr = RILRequest.obtain(RIL_RESPONSE_ACKNOWLEDGEMENT, null);
-            msg = mSender.obtainMessage(EVENT_SEND_ACK, rr);
-            acquireWakeLock(rr, FOR_ACK_WAKELOCK);
-            msg.sendToTarget();
-            if (RILJ_LOGD) {
-                riljLog("Unsol response received for " + responseToString(origResponse) +
-                        " Sending ack to ril.cpp");
-            }
-        }
-
-        /* Remap incorrect respones or ignore them */
-        switch (origResponse) {
-            case RIL_UNSOL_STK_CALL_CONTROL_RESULT:
-            case RIL_UNSOL_DEVICE_READY_NOTI: /* Registrant notification */
-            case RIL_UNSOL_SIM_PB_READY: /* Registrant notification */
-                Rlog.v(RILJ_LOG_TAG,
-                       "SS222: ignoring unsolicited response " +
-                       origResponse);
-                return;
-        }
-
-        if (newResponse != origResponse) {
-            riljLog("SS222RIL: remap unsolicited response from " +
-                    origResponse + " to " + newResponse);
-            p.setDataPosition(dataPosition);
-            p.writeInt(newResponse);
-        }
-
-        switch (newResponse) {
-            case RIL_UNSOL_AM:
-                ret = responseString(p);
-                break;
-            case RIL_UNSOL_STK_SEND_SMS_RESULT:
-                ret = responseInts(p);
-                break;
-            default:
-                // Rewind the Parcel
-                p.setDataPosition(dataPosition);
-
-                // Forward responses that we are not overriding to the super class
-                super.processUnsolicited(p, type);
-                return;
-        }
-
-        switch (newResponse) {
-            case RIL_UNSOL_AM:
-                String strAm = (String)ret;
-                // Add debug to check if this wants to execute any useful am command
-                Rlog.v(RILJ_LOG_TAG, "SS222: am=" + strAm);
-                break;
-        }
     }
 
     @Override
@@ -643,68 +565,42 @@ public class SS222RIL extends RIL implements CommandsInterface {
 
         return response;
     }
-/*
+
     @Override
-    protected void
-    processUnsolicited (Parcel p) {
-        int dataPosition = p.dataPosition();
-        int response = p.readInt();
-        Object ret;
+    protected Object
+    responseSignalStrength(Parcel p) {
+        int numInts = 12;
+        int response[];
 
-        try{switch(response) {
-            case RIL_UNSOL_STK_PROACTIVE_COMMAND: ret = responseString(p); break;
-            case RIL_UNSOL_STK_SEND_SMS_RESULT: ret = responseInts(p); break; // Samsung STK
-            default:
-                // Rewind the Parcel
-                p.setDataPosition(dataPosition);
-
-                // Forward responses that we are not overriding to the super class
-                super.processUnsolicited(p);
-                return;
-        }} catch (Throwable tr) {
-            Rlog.e(RILJ_LOG_TAG, "Exception processing unsol response: " + response +
-                " Exception: " + tr.toString());
-            return;
+        // Get raw data
+        response = new int[numInts];
+        for (int i = 0; i < numInts; i++) {
+            response[i] = p.readInt();
         }
+        // gsm
+        response[0] &= 0xff;
+        // cdma
+        response[2] %= 256;
+        response[4] %= 256;
+        // lte
+        response[7] &= 0xff;
 
-        switch(response) {
-            case RIL_UNSOL_STK_PROACTIVE_COMMAND:
-                if (RILJ_LOGD) unsljLogRet(response, ret);
-
-                if (mCatProCmdRegistrant != null) {
-                    mCatProCmdRegistrant.notifyRegistrant(
-                            new AsyncResult (null, ret, null));
-                } else {
-                    // The RIL will send a CAT proactive command before the
-                    // registrant is registered. Buffer it to make sure it
-                    // does not get ignored (and breaks CatService).
-                    mCatProCmdBuffer = ret;
-                }
-            break;
-            case RIL_UNSOL_STK_SEND_SMS_RESULT:
-                if (RILJ_LOGD) unsljLogRet(response, ret);
-
-                if (mCatSendSmsResultRegistrant != null) {
-                    mCatSendSmsResultRegistrant.notifyRegistrant(
-                            new AsyncResult (null, ret, null));
-                }
-            break;
-        }
-
-    }
-*/
-    @Override
-    public void setOnCatProactiveCmd(Handler h, int what, Object obj) {
-        mCatProCmdRegistrant = new Registrant (h, what, obj);
-        if (mCatProCmdBuffer != null) {
-            mCatProCmdRegistrant.notifyRegistrant(
-                                new AsyncResult (null, mCatProCmdBuffer, null));
-            mCatProCmdBuffer = null;
-        }
+        return new SignalStrength(response[0],
+                                  response[1],
+                                  response[2],
+                                  response[3],
+                                  response[4],
+                                  response[5],
+                                  response[6],
+                                  response[7],
+                                  response[8],
+                                  response[9],
+                                  response[10],
+                                  response[11],
+                                  true);
     }
 
-    private void
-    constructGsmSendSmsRilRequest (RILRequest rr, String smscPDU, String pdu) {
+    private void constructGsmSendSmsRilRequest(RILRequest rr, String smscPDU, String pdu) {
         rr.mParcel.writeInt(2);
         rr.mParcel.writeString(smscPDU);
         rr.mParcel.writeString(pdu);
@@ -715,11 +611,10 @@ public class SS222RIL extends RIL implements CommandsInterface {
      * request properly, so we use RIL_REQUEST_SEND_SMS instead.
      */
     @Override
-    public void
-    sendSMSExpectMore (String smscPDU, String pdu, Message result) {
-        RILRequest rr
-                = RILRequest.obtain(RIL_REQUEST_SEND_SMS, result);
+    public void sendSMSExpectMore(String smscPDU, String pdu, Message result) {
+        Rlog.v(RILJ_LOG_TAG, "SS222: sendSMSExpectMore");
 
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SEND_SMS, result);
         constructGsmSendSmsRilRequest(rr, smscPDU, pdu);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
@@ -728,46 +623,64 @@ public class SS222RIL extends RIL implements CommandsInterface {
     }
 
     @Override
-    protected Object
-    responseSignalStrength(Parcel p) {
-        int gsmSignalStrength = p.readInt() & 0xff;
-        int gsmBitErrorRate = p.readInt();
-        int cdmaDbm = p.readInt();
-        int cdmaEcio = p.readInt();
-        int evdoDbm = p.readInt();
-        int evdoEcio = p.readInt();
-        int evdoSnr = p.readInt();
-        int lteSignalStrength = p.readInt();
-        int lteRsrp = p.readInt();
-        int lteRsrq = p.readInt();
-        int lteRssnr = p.readInt();
-        int lteCqi = p.readInt();
-        int tdScdmaRscp = p.readInt();
-        // constructor sets default true, makeSignalStrengthFromRilParcel does not set it
-        boolean isGsm = true;
+    protected void
+    processUnsolicited(Parcel p, int type) {
+        Object ret;
 
-        if ((lteSignalStrength & 0xff) == 255 || lteSignalStrength == 99) {
-            lteSignalStrength = 99;
-            lteRsrp = SignalStrength.INVALID;
-            lteRsrq = SignalStrength.INVALID;
-            lteRssnr = SignalStrength.INVALID;
-            lteCqi = SignalStrength.INVALID;
-        } else {
-            lteSignalStrength &= 0xff;
+        int dataPosition = p.dataPosition();
+        int origResponse = p.readInt();
+        int newResponse = origResponse;
+
+        /* Remap incorrect respones or ignore them */
+        switch (origResponse) {
+            case RIL_UNSOL_STK_CALL_CONTROL_RESULT:
+            case RIL_UNSOL_DEVICE_READY_NOTI: /* Registrant notification */
+            case RIL_UNSOL_SIM_PB_READY: /* Registrant notification */
+                Rlog.v(RILJ_LOG_TAG,
+                       "SS222: ignoring unsolicited response " +
+                       origResponse);
+                return;
         }
 
-        if (RILJ_LOGD)
-            riljLog("gsmSignalStrength:" + gsmSignalStrength + " gsmBitErrorRate:" + gsmBitErrorRate +
-                    " cdmaDbm:" + cdmaDbm + " cdmaEcio:" + cdmaEcio + " evdoDbm:" + evdoDbm +
-                    " evdoEcio: " + evdoEcio + " evdoSnr:" + evdoSnr +
-                    " lteSignalStrength:" + lteSignalStrength + " lteRsrp:" + lteRsrp +
-                    " lteRsrq:" + lteRsrq + " lteRssnr:" + lteRssnr + " lteCqi:" + lteCqi +
-                    " tdScdmaRscp:" + tdScdmaRscp + " isGsm:" + (isGsm ? "true" : "false"));
+        if (newResponse != origResponse) {
+            riljLog("SS222: remap unsolicited response from " +
+                    origResponse + " to " + newResponse);
+            p.setDataPosition(dataPosition);
+            p.writeInt(newResponse);
+        }
 
-        return new SignalStrength(gsmSignalStrength, gsmBitErrorRate, cdmaDbm, cdmaEcio, evdoDbm,
-                evdoEcio, evdoSnr, lteSignalStrength, lteRsrp, lteRsrq, lteRssnr, lteCqi,
-                tdScdmaRscp, isGsm);
+        switch (newResponse) {
+            case RIL_UNSOL_AM:
+                ret = responseString(p);
+                break;
+            case RIL_UNSOL_STK_SEND_SMS_RESULT:
+                ret = responseInts(p);
+                break;
+            default:
+                // Rewind the Parcel
+                p.setDataPosition(dataPosition);
+
+                // Forward responses that we are not overriding to the super class
+                super.processUnsolicited(p, type);
+                return;
+        }
+
+        switch (newResponse) {
+            case RIL_UNSOL_AM:
+                String strAm = (String)ret;
+                // Add debug to check if this wants to execute any useful am command
+                Rlog.v(RILJ_LOG_TAG, "SS222: am=" + strAm);
+                break;
+        }
     }
 
+    @Override
+    public void setOnCatProactiveCmd(Handler h, int what, Object obj) {
+        mCatProCmdRegistrant = new Registrant (h, what, obj);
+        if (mCatProCmdBuffer != null) {
+            mCatProCmdRegistrant.notifyRegistrant(
+                                new AsyncResult (null, mCatProCmdBuffer, null));
+            mCatProCmdBuffer = null;
+        }
+    }
 }
-
