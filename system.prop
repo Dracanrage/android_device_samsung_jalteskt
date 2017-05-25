@@ -9,3 +9,6 @@ ro.telephony.ril_class=jaRIL
 ro.ril.telephony.mqanelements=6
 ro.telephony.default_network=9
 telephony.lteOnGsmDevice=1
+
+# OTA
+ro.ota.manifest=https://raw.githubusercontent.com/exynos5410/android_device_samsung_jalteskt/cm-14.1/ota.xml
