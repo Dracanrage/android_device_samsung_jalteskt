@@ -19,9 +19,6 @@ LOCAL_PATH := device/samsung/jalteskt
 
 BOARD_VENDOR := samsung
 
-# ODEX
-WITH_DEXPREOPT := true
-
 # Include path
 TARGET_SPECIFIC_HEADER_PATH := $(LOCAL_PATH)/include
 
