@@ -11,6 +11,5 @@ ro.telephony.default_network=9
 telephony.lteOnGsmDevice=1
 
 # OTA
-ro.ota.manifest=https://raw.githubusercontent.com/Dracanrage/Exynos5410_Mokee_OTA/master/jalteskt.xml
-ro.ota.romname=jalteskt
-ro.ota.version=20170826
+ro.ota.manifest=https://raw.githubusercontent.com/Dracanrage/Exynos5410_Mokee_OTA/mkn-mr1/jalteskt.xml
+
